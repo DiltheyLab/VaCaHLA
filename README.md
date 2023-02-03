@@ -1,3 +1,5 @@
+![Pipeline](SnakemakePipeline.png)
+
 ## Pipeline Execution
 
 Use the the [config file](SnakemakePipeline/envs/config.yaml) to adjust parameters for your execution. The pipeline requires normal and tumor fastq samples and reference sequences as input.  It follows an explanation of the input parameters:
