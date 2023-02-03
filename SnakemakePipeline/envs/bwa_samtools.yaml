@@ -1,0 +1,9 @@
+name: bwa_samtools
+channels:
+  - bioconda
+  - main
+  - conda-forge
+dependencies:
+  - bwa = 0.7.17
+  - samtools = 1.10
+  - java-jdk = 8.0.112

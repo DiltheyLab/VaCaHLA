@@ -1,0 +1,8 @@
+name: rmsc
+channels:
+  - bioconda
+  - main
+  - conda-forge
+dependencies:
+  - pysam = 0.16.0
+  - samtools = 1.10

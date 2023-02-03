@@ -1,0 +1,8 @@
+name: histograms
+channels:
+  - bioconda
+  - main
+  - conda-forge
+dependencies:
+  - pysam = 0.16.0
+  - plotly = 4.14.3

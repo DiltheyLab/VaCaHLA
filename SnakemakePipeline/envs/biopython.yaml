@@ -1,0 +1,9 @@
+name: biopython
+channels:
+  - bioconda
+  - main
+  - conda-forge
+dependencies:
+  - biopython = 1.78
+  - samtools = 1.10
+  - pysam = 0.16.0

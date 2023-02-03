@@ -1,0 +1,13 @@
+prefix: 'patient'
+
+idMapping: '/patientMappingB2mNachmacher.txt'
+path: '/srv/homes/schulte/realData/B2mNachmacher'
+folder: ['/healthySamples', '/tumorSamples']
+referenceFolder: '/embeddedPersonalReferences'
+
+hg38path: '/srv/homes/schulte/hg38References'
+hg38replaced: '/srv/homes/schulte/hg38References/GCA_000001405.15_GRCh38_Replaced_HLA.fasta'
+
+sampleGenes: ['A', 'B', 'B2M', 'C', 'DRB1', 'DQA1', 'DQB1', 'DPB1', 'E', 'F', 'G', 'H', 'TAP1', 'TAP2', 'MICA', 'MICB']
+
+prefiltering: True

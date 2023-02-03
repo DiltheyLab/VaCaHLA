@@ -1,0 +1,438 @@
+import os
+import re
+from datetime import date
+
+configfile: 'envs/config.yaml'
+
+genes = config['sampleGenes']
+path = config['path']
+folder = config['folder']
+referenceFolder = config['referenceFolder']
+idMapping = config['idMapping']
+
+try:
+    os.path.exists(path)
+    os.makedirs(path + folder[0] + '/hg38BAM', exist_ok=True)
+    os.makedirs(path + folder[1] + '/hg38BAM', exist_ok=True)
+    os.makedirs(path + '/mutect2', exist_ok=True)
+    os.makedirs(path + '/mutect1', exist_ok=True)
+    os.makedirs(path + '/strelka2', exist_ok=True)
+except OSError:
+    print (path + ' one or more do not exist or pemission to open denied')
+
+
+idList = []
+with open(path + idMapping) as mapping:
+    idList = [tuple(line.replace('\n', '').split('\t')) for line in mapping if not (len(line.strip()) == 0 or line.strip()[0] == '#')]
+
+
+
+rule all:
+    input:
+        expand(config['hg38path'] + '/hg38_{gene}.fasta{ext}', gene = genes, ext=['.fai', '.amb', '.ann', '.bwt', '.pac', '.sa']),
+        expand('{path}/mutect2/filtered_mutect_{patientID[0]}_{patientID[1]}_{gene}.vcf', path = path, patientID = idList, gene = genes),
+        expand('{path}/strelka2/strelka_{patientID[0]}_{patientID[1]}_{gene}.vcf', path = path, patientID = idList, gene = genes),
+        expand('{path}/mutect1/mutect1_{patientID[0]}_{patientID[1]}_{gene}.vcf', path = path, patientID = idList, gene = genes),
+        expand('{path}/kmerFilteredVariants/{caller}_{patientID[0]}_{patientID[1]}_{gene}.csv', path = path, caller = ['mutect2/filtered_mutect', 'strelka2/strelka', 'mutect1/mutect1'], patientID = idList, gene = genes),
+        expand('{path}/tumorSamples/plots/histogram_{patientID[0]}.html', path = path, patientID = idList),
+        expand('{path}/kmerFilteredVariants/{filterStatus}_merged.csv', path = path, filterStatus = ['True', 'False']),
+        expand('{path}/healthySamples/plots/histogram_{patientID[1]}.html', path = path, patientID = idList)
+
+
+rule check_input:
+    input:
+        r1 = '{path}/{patientID}_R1' + ('_filtered.fastq' if config['prefiltering'] else '.fastq')
+    output:
+        temp(touch('{path}/{patientID}.checked'))
+    script:
+        'scripts/checkReadIDs.py'
+
+
+rule fastqc:
+    input:
+        r1 = '{path}/{patientID}_R1' + ('_filtered.fastq' if config['prefiltering'] else '.fastq')
+    params:
+        file = '{path}/fastqc/{patientID}_R1' + ('_filtered_fastqc.html' if config['prefiltering'] else '.html'),
+        dir = '{path}/fastqc/'
+    output:
+        '{path}/fastqc/{patientID}_R1_fastqc.html'
+    conda:
+        'envs/fastqc.yaml'
+    shell:
+        'fastqc -o {params.dir} {input} && mv {params.file} {output} || true'
+
+
+rule fasta_index:
+    input:
+        '{path}.fasta'
+    output:
+        '{path}.fasta.fai',
+        '{path}.fasta.amb',
+        '{path}.fasta.ann',
+        '{path}.fasta.bwt',
+        '{path}.fasta.pac',
+        '{path}.fasta.sa'
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        '''
+        bwa index {input}
+        samtools faidx {input}
+        '''
+
+
+rule create_personal_grch38:
+    input:
+        hg38_replaced = config['hg38replaced'],
+        ref = '{path}' + config['referenceFolder'] + '/' + config['prefix'] + '{patientID}.fasta'
+    output:
+        '{path}' + config['referenceFolder'] + '/{patientID}_replaced_HLA_hg38.fasta'
+    shell:
+        'cat {input.hg38_replaced} {input.ref} > {output}'
+
+
+rule prefilter_bwa:
+    input:
+        '{path}' + config['referenceFolder'] + '/{patientID}_replaced_HLA_hg38.fasta.bwt',
+        '{path}' + config['referenceFolder'] + '/{patientID}_replaced_HLA_hg38.fasta.fai',
+        personal_hg38_ref = '{path}' + config['referenceFolder'] + '/{patientID}_replaced_HLA_hg38.fasta',
+        r1 = '{path}/{patientID}_R1.fastq',   #input must exist
+        r2 = '{path}/{patientID}_R2.fastq'
+    output:
+        '{path}/{patientID}_prefiltered.bam'
+    threads: 15
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        'bwa mem -Y {input.personal_hg38_ref} {input.r1} {input.r2} | samtools sort -o {output}'
+
+
+rule prefilter:
+    input:
+        '{path}/{patientID}_prefiltered.bam.bai',
+        ref = '{path}' + config['referenceFolder'] + '/' + config['prefix'] + '{patientID}.fasta',
+        bam = '{path}/{patientID}_prefiltered.bam'
+    params:
+        patient = '{patientID}',
+        path = '{path}'
+    output:
+        '{path}/{patientID}_R1_filtered.fastq',
+        '{path}/{patientID}_R2_filtered.fastq',
+        temp('{path}/prefilter_reads_done_{patientID}.txt')
+    conda:
+        'envs/biopython.yaml'
+    script:
+        'scripts/prefilterReads.py'
+
+
+rule cat_fastqs:
+    input:
+        '{path}/{patientID}.checked',               # ensure rule check_input execution
+        '{path}/fastqc/{patientID}_R1_fastqc.html', # ensure rule fastqc execution
+        r1 = '{path}/{patientID}_R1' + ('_filtered.fastq' if config['prefiltering'] else '.fastq'),
+        r2 = '{path}/{patientID}_R2' + ('_filtered.fastq' if config['prefiltering'] else '.fastq')
+    output:
+        temp('{path}/{patientID}_merged.fastq')
+    shell:
+        'cat {input.r1} {input.r2} > {output}'
+
+
+rule create_kmers:
+    input:
+        '{path}/{patientID}_merged.fastq'    #input from cat_fastqs
+    output:
+        temp('{path}/{patientID}_counts.jf')
+    conda:
+        'envs/kmer-jellyfish.yaml'
+    shell:
+        'jellyfish count -m 31 -s 100M -t 10 -C {input} -o {output}'
+
+
+rule kmers_to_fastq:
+    input:
+        '{path}/{patientID}_counts.jf'   #input from create_kmers
+    output:
+        '{path}/{patientID}_counts_dumps.fasta'
+    conda:
+        'envs/kmer-jellyfish.yaml'
+    shell:
+        'jellyfish dump {input} -o {output}'
+
+
+rule personal_bwa:
+    input:
+        '{path}' + config['referenceFolder'] + '/' + config['prefix'] + '{patientID}.fasta.fai',           #input from rule index
+        ref = '{path}' + config['referenceFolder'] + '/' + config['prefix'] + '{patientID}.fasta',
+        r1 = '{path}/{patientID}_R1' + ('_filtered.fastq' if config['prefiltering'] else '.fastq'),
+        r2 = '{path}/{patientID}_R2' + ('_filtered.fastq' if config['prefiltering'] else '.fastq')
+    output:
+        '{path}/personal_bwa_{patientID}.bam'
+    threads: 15
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        '''
+        rm -f {output}.tmp.0000.bam
+        bwa mem -Y {input.ref} {input.r1} {input.r2} | samtools sort -o {output} -
+        rm -f {output}.tmp.0000.bam
+        '''
+
+
+rule filter_paired_reads:
+    input:
+        '{path}/personal_bwa_{patientID}.bam.bai',
+        bam = '{path}/personal_bwa_{patientID}.bam'
+    output:
+        '{path}/number_rm_reads_{patientID}.txt',
+        temp('{path}/cleared_personal_bwa_{patientID}.bam')
+    conda:
+        'envs/biopython.yaml'
+    script:
+        'scripts/filterReadPairs.py'
+
+
+rule sort_filtered:
+    input:
+        '{path}/cleared_personal_bwa_{patientID}.bam'
+    output:
+        '{path}/sort_cleared_{patientID}.bam'
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        'samtools sort {input} > {output}'
+
+
+rule bwa_index:
+    input:
+        '{path}.bam'        #input from rule sort_filtered
+    output:
+        '{path}.bam.bai'
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        'samtools index {input} {output}'
+
+
+rule assign_reads:
+    input:
+        '{path}/sort_cleared_{patientID}.bam.bai',            #input from rule bwa_index & personal_bwa
+        ref = '{path}' + config['referenceFolder'] + '/' + config['prefix'] + '{patientID}.fasta',
+        bam = '{path}/sort_cleared_{patientID}.bam'
+    params:
+        gene = '{gene}',
+        patient = '{patientID}',
+        path = '{path}'
+    output:
+        '{path}/assign_reads_{patientID}_{gene}.bam',
+        temp('{path}/assign_reads_done_{patientID}_{gene}.txt')
+    conda:
+        'envs/biopython.yaml'
+    script:
+        'scripts/assignReads.py'
+
+
+rule sort_bam:
+    input:
+        '{path}/assign_reads_{patientID}_{gene}.bam'     #input from assign_reads
+    output:
+        '{path}/sorted_{patientID}_{gene}.bam'
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        'samtools sort -n {input} > {output}'
+
+
+rule bam_to_fastq:
+    input:
+        bam = '{path}/sorted_{patientID}_{gene}.bam',    #input from sort_bam
+    output:
+        r1 = '{path}/{patientID}_{gene}_READ1.fastq',
+        r2 = '{path}/{patientID}_{gene}_READ2.fastq'
+    conda:
+        'envs/bedtools.yaml'
+    shell:
+        'if [ $(samtools view -c {input.bam}) -eq 0 ]; then touch {output.r1} {output.r2}; else bedtools bamtofastq -i {input.bam} -fq {output.r1} -fq2 {output.r2}; fi'
+
+
+rule hg38_bwa:
+    input:
+        config['hg38path'] + '/hg38_{gene}.fasta.fai',
+        config['hg38path'] + '/hg38_{gene}.fasta.bwt',
+        hg38allele = config['hg38path'] + '/hg38_{gene}.fasta',
+        r1 = '{path}/{patientID}_{gene}_READ1.fastq',       #input from bam_to_fastq
+        r2 = '{path}/{patientID}_{gene}_READ2.fastq',
+    output:
+        '{path}/hg38BAM/hg38_bwa_{patientID}_{gene}.bam'
+    threads: 15
+    conda:
+        'envs/bwa_samtools.yaml'
+    shell:
+        'bwa mem -Y {input.hg38allele} {input.r1} {input.r2} | samtools sort -o {output}'
+
+
+rule rm_soft_clipping:
+    input:
+        '{path}/hg38BAM/hg38_bwa_{patientID}_{gene}.bam.bai',
+        bamfile = '{path}/hg38BAM/hg38_bwa_{patientID}_{gene}.bam'
+    output:
+        temp('{path}/hg38BAM/rmsc_hg38_bwa_{patientID}_{gene}.bam')
+    conda:
+        'envs/rmsc.yaml'
+    script:
+        'scripts/rmSoftClipping.py'
+
+
+rule create_sequence_dictionary:
+    input:
+        config['hg38path'] + '/hg38_{gene}.fasta'
+    output:
+        config['hg38path'] + '/hg38_{gene}.dict'
+    conda:
+        'envs/picard.yaml'
+    shell:
+        '''
+        picard CreateSequenceDictionary R={input} O={output}
+        samtools faidx {input}
+        '''
+
+
+rule create_read_groups:
+    input:
+        '{path}/hg38BAM/rmsc_hg38_bwa_{patientID}_{gene}.bam'    #input from rm_soft_clipping
+    params:
+        gene = '{gene}',
+        patient = '{patientID}',
+        path = '{path}'
+    output:
+        '{path}/hg38BAM/rg_hg38_{patientID}_{gene}.bam',
+        temp('{path}/hg38BAM/rg_done_{patientID}_{gene}.txt')
+    conda:
+        'envs/picard.yaml'
+    script:
+        'scripts/createReadGroups.py'
+
+
+rule mutect2:
+    input:
+        config['hg38path'] + '/hg38_{gene}.dict',       #input from create_read_groups
+        #'{path}/healthySamples/hg38BAM/hg38_bwa_{patientIDhealthy}_{gene}.bam',
+        ref = config['hg38path'] + '/hg38_{gene}.fasta',
+        tumor = '{path}/tumorSamples/hg38BAM/rg_hg38_{patientIDtumor}_{gene}.bam',
+        healthy = '{path}/healthySamples/hg38BAM/rg_hg38_{patientIDhealthy}_{gene}.bam'
+    params:
+        gene = '{gene}',
+        path = '{path}'
+    output:
+        temp('{path}/mutect2/mutect_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'),
+        temp('{path}/mutect2/mutect2_done_{patientIDtumor}_{patientIDhealthy}_{gene}.txt')
+    conda:
+        'envs/gatk4.yaml'
+    script:
+        'scripts/mutect2.py'
+
+
+rule filter_vcf:
+    input:
+        ref = config['hg38path'] + '/hg38_{gene}.fasta',
+        unfiltered = '{path}/mutect2/mutect_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'
+    output:
+        '{path}/mutect2/filtered_mutect_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'
+    conda:
+        'envs/gatk4.yaml'
+    shell:
+        'gatk --java-options "-Xmx4g" FilterMutectCalls -R {input.ref} -V {input.unfiltered} -O {output}'
+
+
+rule configure_strelka:
+    input:
+        ref = config['hg38path'] + '/hg38_{gene}.fasta',
+        healthy = '{path}/healthySamples/hg38BAM/rg_hg38_{patientIDhealthy}_{gene}.bam',
+        tumor = '{path}/tumorSamples/hg38BAM/rg_hg38_{patientIDtumor}_{gene}.bam'
+    output:
+        runDir = directory('{path}/strelka2/temp/strelka_{patientIDtumor}_{patientIDhealthy}_{gene}')
+    conda:
+        'envs/strelka.yaml'
+    shell:
+        'configureStrelkaSomaticWorkflow.py --referenceFasta {input.ref} --normalBam {input.healthy} --tumorBam {input.tumor} --runDir {output.runDir}'
+
+
+rule strelka:
+    input:
+        dir = rules.configure_strelka.output.runDir
+    output:
+        '{path}/strelka2/strelka_{patientIDtumor}_{patientIDhealthy}_{gene}_strelkaIsDone.txt'
+    conda:
+        'envs/strelka.yaml'
+    shell:
+        '{input}/runWorkflow.py -m local -j 1 && touch {output}'
+
+
+rule unzip_strelka:
+    input:
+        '{path}/strelka2/strelka_{patientIDtumor}_{patientIDhealthy}_{gene}_strelkaIsDone.txt'
+    params:
+        '{path}/strelka2/temp/strelka_{patientIDtumor}_{patientIDhealthy}_{gene}'
+    output:
+        '{path}/strelka2/strelka_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'
+    shell:
+        'gunzip -c {params}/results/variants/somatic.snvs.vcf.gz > {output}'
+
+
+rule mutect1:
+    input:
+        config['hg38path'] + '/hg38_{gene}.dict',       #input from create_read_groups
+        ref = config['hg38path'] + '/hg38_{gene}.fasta',
+        tumor = '{path}/tumorSamples/hg38BAM/rg_hg38_{patientIDtumor}_{gene}.bam',
+        healthy = '{path}/healthySamples/hg38BAM/rg_hg38_{patientIDhealthy}_{gene}.bam'
+    output:
+        '{path}/mutect1/mutect1_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'
+    singularity:
+        'docker://maxulysse/mutect1:2.0.0'
+    shell:
+        'java -Xmx2g -jar /opt/mutect-1.1.5/muTect.jar --analysis_type MuTect --reference_sequence {input.ref} --input_file:normal {input.healthy} --input_file:tumor {input.tumor} --vcf {output}'
+
+
+rule kmer_filter:
+    input:
+        '{path}/tumorSamples/{patientIDtumor}_counts_dumps.fasta',
+        '{path}/healthySamples/{patientIDhealthy}_counts_dumps.fasta',
+        vcfInput = '{path}/{caller}_{patientIDtumor}_{patientIDhealthy}_{gene}.vcf'
+    output:
+        '{path}/kmerFilteredVariants/{caller}_{patientIDtumor}_{patientIDhealthy}_{gene}.csv'
+    conda:
+        'envs/pypackages.yaml'
+    script:
+        'scripts/kmerFilter.py'
+
+
+rule concat_filter_output:
+    input:
+        expand('{{path}}/kmerFilteredVariants/{{subfolder}}/{{prefix}}_{patientID[0]}_{patientID[1]}_{gene}.csv', patientID = idList, gene = genes)
+    params:
+        files = '{path}/kmerFilteredVariants/{subfolder}/{prefix}'
+    output:
+        '{path}/kmerFilteredVariants/{subfolder}/cat_{prefix}_{filterStatus}.csv'
+    shell:
+        'cat {params.files}*.csv | grep "{wildcards.filterStatus}" > {output}'
+
+
+rule merge_concat_filter_output:
+    input:
+        mutect1 = '{path}/kmerFilteredVariants/mutect1/cat_mutect1_{filterStatus}.csv',
+        mutect2 = '{path}/kmerFilteredVariants/mutect2/cat_filtered_mutect_{filterStatus}.csv',
+        strelka2 = '{path}/kmerFilteredVariants/strelka2/cat_strelka_{filterStatus}.csv'
+    output:
+        '{path}/kmerFilteredVariants/{filterStatus}_merged.csv'
+    script:
+        'scripts/catFilterOutput.py'
+
+
+rule histograms:
+    input:
+        expand('{{path}}/hg38BAM/hg38_bwa_{{patientID}}_{gene}.bam.bai', gene = genes)
+    output:
+        '{path}/plots/histogram_{patientID}.html'
+    conda:
+        'envs/histograms.yaml'
+    script:
+        'scripts/clippingHisto.py'

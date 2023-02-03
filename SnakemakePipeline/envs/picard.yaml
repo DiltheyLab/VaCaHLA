@@ -1,0 +1,8 @@
+name: picard
+channels:
+  - bioconda
+  - main
+  - conda-forge
+dependencies:
+  - picard = 2.23.8
+  - samtools = 1.10
