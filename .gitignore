@@ -155,6 +155,7 @@ fabric.properties
 # Test Data bc it is too large for git
 SnakemakePipeline/testData
 SnakemakePipeline/testData.zip
+SnakemakePipeline/testData.tar.gz
 
 **/gurobi.log
 ../../gurobi.log
