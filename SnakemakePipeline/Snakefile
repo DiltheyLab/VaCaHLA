@@ -6,14 +6,13 @@ configfile: 'envs/config.yaml'
 
 genes = config['sampleGenes']
 path = config['path']
-folder = config['folder']
 referenceFolder = config['referenceFolder']
 idMapping = config['idMapping']
 
 try:
     os.path.exists(path)
-    os.makedirs(path + folder[0] + '/hg38BAM', exist_ok=True)
-    os.makedirs(path + folder[1] + '/hg38BAM', exist_ok=True)
+    os.makedirs(path + '/healthySamples/hg38BAM', exist_ok=True)
+    os.makedirs(path + '/tumorSamples/hg38BAM', exist_ok=True)
     os.makedirs(path + '/mutect2', exist_ok=True)
     os.makedirs(path + '/mutect1', exist_ok=True)
     os.makedirs(path + '/strelka2', exist_ok=True)
