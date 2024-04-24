@@ -1,12 +1,12 @@
 # ![Logo](vacahla_logo.png)aCaHLA - Variant Calling in the HLA region on Illumina Amplicon Sequencing Data
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11061968.svg)](https://doi.org/10.5281/zenodo.11061968)
 
 ![Pipeline](SnakemakePipeline.png)
 
 VaCaHLA is designed to perform variant calling int the HLA region using Illumina amplicon sequencing data. The workflow is shown above.
 ## Pipeline Execution
 ### Data
-As input, the pipeline requires paired-end Illumina amplicon fastq files, personalized reference fasta files containing the individual HLA references, and the GRCh38 reference. A generated test sample and necessary reference data can be found [here]().
+As input, the pipeline requires paired-end Illumina amplicon fastq files, personalized reference fasta files containing the individual HLA references, and the GRCh38 reference. A generated test sample and necessary reference data can be found [here](https://doi.org/10.5281/zenodo.11061968).
 
 ### Preparation
 This pipeline is based on the Snakemake workflow and management system and uses conda to automatically deploy the required software. Make sure to have [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) installed. Start with creating an environment for the pipeline execution by running the following commands:
