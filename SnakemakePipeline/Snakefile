@@ -412,7 +412,7 @@ rule concat_filter_output:
     output:
         '{path}/kmerFilteredVariants/{subfolder}/cat_{prefix}_{filterStatus}.csv'
     shell:
-        'cat {params.files}*.csv | grep "{wildcards.filterStatus}" > {output}'
+        'cat {params.files}*.csv | grep "{wildcards.filterStatus}" > {output} || true'
 
 
 rule merge_concat_filter_output:
@@ -431,6 +431,8 @@ rule histograms:
         expand('{{path}}/hg38BAM/hg38_bwa_{{patientID}}_{gene}.bam.bai', gene = genes)
     output:
         '{path}/plots/histogram_{patientID}.html'
+    params:
+        all_genes = genes
     conda:
         'envs/histograms.yaml'
     script:

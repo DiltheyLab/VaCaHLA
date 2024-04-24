@@ -154,8 +154,7 @@ for rec in records:
     relation = (variantCarryingReadCountsN[0] / variantCarryingReadCountsT[0]) * 100
     if relation > 10:
         isFiltered = True
-    
-    # TODO		
+
     strandBias = 'No'
     # filter for strand bias at 25% to 75% relation
     if abs(biasFilterT[0]-biasFilterT[1]) >= 50:

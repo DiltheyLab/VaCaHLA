@@ -27,7 +27,7 @@ def count_clipping(file):
 
 
 # START
-genes = snakemake.genes # ['A', 'B', 'B2M', 'C', 'DRB1', 'DQA1', 'DQB1', 'DPB1', 'E', 'F', 'G', 'H', 'TAP1', 'TAP2', 'MICA', 'MICB']
+genes = snakemake.params.all_genes
 patient = snakemake.wildcards.patientID
 path = snakemake.wildcards.path
 output = str(snakemake.output)
@@ -63,9 +63,9 @@ for gene in genes:
     y_label_coordinates[gene] = val[0][1]
 
 # Create histogram plots
-fig = make_subplots(rows=8, cols=2, subplot_titles=tuple(genes), vertical_spacing=0.04)
+fig = make_subplots(rows=int(len(genes)/2 + 0.5), cols=2, subplot_titles=tuple(genes), vertical_spacing=0.04)
 
-for i in range(0, 16, 2):
+for i in range(0, len(genes), 2):
     fig.add_trace(go.Histogram(x=clipping_values[genes[i]],
                                name=genes[i],
                                xbins_size=1),
@@ -76,15 +76,16 @@ for i in range(0, 16, 2):
         text='Total number of reads: ' + str(count_reads[genes[i]]) + '<br>Total number of clipped reads: ' + str(count_clipped[genes[i]]),
         row=i // 2 + 1, col=1, x=200, y=y_label_coordinates[genes[i]], showarrow=False)
 
-    fig.add_trace(go.Histogram(x=clipping_values[genes[i + 1]],
-                               name=genes[i + 1],
-                               xbins_size=1),
-                  row=i // 2 + 1, col=2)
-    fig.update_xaxes(title_text='Soft Clipping Length', row=i // 2 + 1, col=2)
-    fig.update_yaxes(title_text='Frequency', row=i // 2 + 1, col=2)
-    fig.add_annotation(
-        text='Total number of reads: ' + str(count_reads[genes[i + 1]]) + '<br>Total number of clipped reads: ' + str(count_clipped[genes[i+1]]),
-        row=i // 2 + 1, col=2, x=200, y=y_label_coordinates[genes[i + 1]], showarrow=False)
+    if i+1 < len(genes):
+        fig.add_trace(go.Histogram(x=clipping_values[genes[i + 1]],
+                                   name=genes[i + 1],
+                                   xbins_size=1),
+                      row=i // 2 + 1, col=2)
+        fig.update_xaxes(title_text='Soft Clipping Length', row=i // 2 + 1, col=2)
+        fig.update_yaxes(title_text='Frequency', row=i // 2 + 1, col=2)
+        fig.add_annotation(
+            text='Total number of reads: ' + str(count_reads[genes[i + 1]]) + '<br>Total number of clipped reads: ' + str(count_clipped[genes[i+1]]),
+            row=i // 2 + 1, col=2, x=200, y=y_label_coordinates[genes[i + 1]], showarrow=False)
 
 fig.update_traces(marker=dict(color='midnightblue'), selector=dict(type='histogram'))
 fig.update_layout(height=3000, width=1500)
