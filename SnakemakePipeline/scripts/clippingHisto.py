@@ -27,7 +27,7 @@ def count_clipping(file):
 
 
 # START
-genes = ['A', 'B', 'B2M', 'C', 'DRB1', 'DQA1', 'DQB1', 'DPB1', 'E', 'F', 'G', 'H', 'TAP1', 'TAP2', 'MICA', 'MICB']
+genes = snakemake.genes # ['A', 'B', 'B2M', 'C', 'DRB1', 'DQA1', 'DQB1', 'DPB1', 'E', 'F', 'G', 'H', 'TAP1', 'TAP2', 'MICA', 'MICB']
 patient = snakemake.wildcards.patientID
 path = snakemake.wildcards.path
 output = str(snakemake.output)

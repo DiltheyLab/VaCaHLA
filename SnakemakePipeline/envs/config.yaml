@@ -1,7 +1,7 @@
 prefix: 'patient'
 
 idMapping: '/patientMapping.txt'
-# path to data folder, must contain the folders "normalSamples" and "tumorSamples", containing the normal and tumor
+# path to data folder, must contain the folders "healthySamples" and "tumorSamples", containing the normal and tumor
 # fastq files and a subfolder "personalReferences" for the normal data and tumor data, respectively
 path: 'testData'
 referenceFolder: '/personalReferences'
