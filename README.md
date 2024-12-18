@@ -8,6 +8,8 @@ VaCaHLA is designed to perform variant calling int the HLA region using Illumina
 ### Data
 As input, the pipeline requires paired-end Illumina amplicon fastq files, personalized reference fasta files containing the individual HLA references, and the GRCh38 reference. A generated test sample and necessary reference data can be found [here](https://doi.org/10.5281/zenodo.11061968).
 
+We provide the HLA sequences of genes in which mutations were identified. We reserve the right to disclose additional data only upon request and with appropriate justification, in order to protect patient privacy. The Illumina sequencing data is available at SRA accession [PRJNA1192288](https://dataview.ncbi.nlm.nih.gov/object/PRJNA1192288). The corresponding nanopore alignment files used for validation, along with the corresponding reference files, are available at SRA accession [PRJNA1198493](https://www.ncbi.nlm.nih.gov/sra/PRJNA1198493). (Note: Once our manuscript is published, the data will be accessible under the given links.)
+
 ### Preparation
 This pipeline is based on the Snakemake workflow and management system and uses conda to automatically deploy the required software. Make sure to have [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) installed. Start with creating an environment for the pipeline execution by running the following commands:
 
