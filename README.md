@@ -1,10 +1,12 @@
-# ![Logo](vacahla_logo.png)aCaHLA - Variant Calling in the HLA region on Illumina Amplicon Sequencing Data
+# ![V](vacahla_logo.png)aCaHLA - Variant Calling in the HLA region on Illumina Amplicon Sequencing Data
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11061968.svg)](https://doi.org/10.5281/zenodo.11061968)
+
+# Abstract
+Immune evasion is a hallmark of gliomas, yet the genetic mechanisms by which tumors escape immune surveillance remain incompletely understood. In this study, we systematically examined the presence of somatic mutations in HLA genes and genes encoding proteins involved in antigen presentation across isocitrate dehydrogenase wild-type and mutant gliomas using targeted next-generation sequencing. To address the challenges associated with detecting somatic mutations in these highly polymorphic and complex regions of the genome, we applied a combination of short-read and long-read sequencing techniques, extended the genetic region of interest (exons and introns), and applied a tailored bioinformatics analysis pipeline, which enabled an accurate evaluation of comprehensive sequencing data. Our analysis identified mutations in HLA class II and nonclassic HLA genes as well as genes associated with antigen presentation, such as TAP1/2 and B2M. Three-dimensional modeling of individual mutations simulated the potential impact of somatic mutations in TAP1 and B2M on the encoded protein configuration. The presence of somatic mutations supports the role of antigen-presenting genes in the pathophysiology and potential immune escape of gliomas. Our data demonstrated an increased frequency of such mutations in recurrent glioblastoma, potentially resulting from a positive selection or mutagenic enrichment of tumor cells during tumor progression. Taken together, this research generates new insights and hypotheses for the functional analysis and optimization of immunotherapy strategies for gliomas, which may guide personalized treatment paradigms.
 
 ![Pipeline](SnakemakePipeline.png)
 
-VaCaHLA is designed to perform variant calling int the HLA region using Illumina amplicon sequencing data. The workflow is shown above.
-## Pipeline Execution
+# Pipeline Execution
 ### Data
 As input, the pipeline requires paired-end Illumina amplicon fastq files, personalized reference fasta files containing the individual HLA references, and the GRCh38 reference. A generated test sample and necessary reference data can be found [here](https://doi.org/10.5281/zenodo.11061968).
 
@@ -40,3 +42,16 @@ snakemake --cores $number$ --use-conda --use-singularity --singularity-args "--b
 All software requirements are deployed automatically via conda environments.
 
 As output, you get the filtered variant calls as csv files. *False_merged.csv* contains all variant calls from all three variant calling tools that remained after applying our kmer filter. *True_merged.csv* contains the variant calls that were filtered out.
+
+# Please Cite
+The VaCaHLA manuscript is published at [Cancer Immunology Research](https://doi.org/10.1158/2326-6066.CIR-24-0419). If you use VaCaHLA for your work, please cite out paper.
+```
+@article{schulte2025somatic,
+  title={Somatic Mutations in HLA Class Genes and Antigen-Presenting Molecules in Malignant Glioma},
+  author={Schulte, Sara C and Peter, Wolfgang and Rosenberger, Georg and Sch{\"a}fer, Moritz and Maire, Cecile L and R{\"u}nger, Alessandra and Ryba, Alice and Riecken, Kristoffer and Fita, Krystian D and Matschke, Jakob and others},
+  journal={Cancer Immunology Research},
+  pages={OF1--OF13},
+  year={2025},
+  publisher={American Association for Cancer Research}
+}
+```
